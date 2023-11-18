@@ -176,7 +176,7 @@ class Mesh:
         if vertex_format & VertexFormat.UV1:
             vertex_attributes.append(("UV1", np.float32, (2,)))
         if vertex_format & VertexFormat.UV2:
-            vertex_attributes.append(("UV1", np.float32, (2,)))
+            vertex_attributes.append(("UV2", np.float32, (2,)))
         if have_skeleton:
             vertex_attributes.append(("RIG_RELATED", np.uint8, (8,)))
         pprint(vertex_attributes)
