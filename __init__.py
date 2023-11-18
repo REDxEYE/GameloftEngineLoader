@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import bpy
+import numpy as np
 from mathutils import Vector, Quaternion, Matrix
 
 from .pig import Node, load_pig
@@ -46,10 +47,9 @@ def pig_load(operator, filepath: str, files: list[str]):
     base_path = Path(filepath).parent
     for file in files:
         filepath = base_path / file
-
-        with FileBuffer(file, "rb") as f:
-            nodes, objects = load_pig(file.stem, f)
-        _create_skeleton(file.stem, nodes)
+        with FileBuffer(filepath, "rb") as f:
+            nodes, objects = load_pig(filepath.stem, f)
+        _create_skeleton(filepath.stem, nodes)
 
         for object in objects:
             node = nodes[object.node_id]
@@ -76,7 +76,7 @@ plugin_info = {
     "name": "Gameloft engine",
     "id": "GameloftEngineLoader",
     "description": "Import Gameloft engine assets",
-    "version": (0, 1, 0),
+    "version": (0, 1, 1),
     "loaders": [
         {
             "name": "Load .pig file",
