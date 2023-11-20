@@ -27,17 +27,22 @@ def _create_skeleton(model_name: str, nodes: list[Node]):
 
     for bone in nodes:
         bl_bone = arm_data.edit_bones.new(bone.name)
-        bl_bone.tail = Vector([0, 0, 0.5 * bone.unk0]) + bl_bone.head
+        bl_bone.tail = Vector([0, 0, 0.5 * max(0.01, bone.unk0)]) + bl_bone.head
+    for bone in nodes:
+        bl_bone = arm_data.edit_bones[bone.name]
+        if bone.parent_id != -1:
+            bl_bone.parent = arm_data.edit_bones[nodes[bone.parent_id].name]
+    bpy.ops.object.mode_set(mode='POSE')
     for bone in nodes:
         x, y, z, w = bone.rotation
         matrix = Matrix.LocRotScale(Vector(bone.position), Quaternion((w, x, y, z)), Vector(bone.scale))
-        if bone.parent_id != -1:
-            bl_bone.parent = arm_data.edit_bones[nodes[bone.parent_id].name]
+        bl_bone = arm_obj.pose.bones[bone.name]
 
         if bl_bone.parent:
             bl_bone.matrix = bl_bone.parent.matrix @ matrix
         else:
             bl_bone.matrix = matrix
+    bpy.ops.pose.armature_apply()
     bpy.ops.object.mode_set(mode='OBJECT')
     return arm_obj
 
