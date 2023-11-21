@@ -25,16 +25,22 @@ def _create_skeleton(model_name: str, nodes: list[Node]):
     bpy.context.view_layer.objects.active = arm_obj
     bpy.ops.object.mode_set(mode='EDIT')
 
-    for bone in nodes:
+    for n, bone in enumerate(nodes):
+        if bone.type == 0 and n != 0:
+            continue
         bl_bone = arm_data.edit_bones.new(bone.name)
         bl_bone.tail = Vector([0, 0, 0.5 * max(0.01, bone.unk0)]) + bl_bone.head
-    for bone in nodes:
+    for n, bone in enumerate(nodes):
+        if bone.type == 0 and n != 0:
+            continue
         bl_bone = arm_data.edit_bones[bone.name]
         if bone.parent_id != -1:
             bl_bone.parent = arm_data.edit_bones[nodes[bone.parent_id].name]
     bpy.ops.object.mode_set(mode='POSE')
-    for bone in nodes:
-        x, y, z, w = bone.rotation
+    for n, bone in enumerate(nodes):
+        if bone.type == 0 and n != 0:
+            continue
+        z, y, x, w = bone.rotation
         matrix = Matrix.LocRotScale(Vector(bone.position), Quaternion((w, x, y, z)), Vector(bone.scale))
         bl_bone = arm_obj.pose.bones[bone.name]
 
@@ -54,7 +60,7 @@ def pig_load(operator, filepath: str, files: list[str]):
         filepath = base_path / file
         with FileBuffer(filepath, "rb") as f:
             nodes, objects = load_pig(filepath.stem, f)
-        _create_skeleton(filepath.stem, nodes)
+        skeleton_object = _create_skeleton(filepath.stem, nodes)
 
         for object in objects:
             node = nodes[object.node_id]
@@ -64,7 +70,10 @@ def pig_load(operator, filepath: str, files: list[str]):
                     mesh_obj = bpy.data.objects.new(node.name, mesh_data)
                     mesh_data.from_pydata(mesh.vertices["POSITION"], [], mesh.faces)
                     mesh_data.update(calc_edges=True, calc_edges_loose=True)
-                    # mesh_obj.location = mesh.pivot_point
+                    x, y, z, w = node.rotation
+                    mesh_obj.matrix_local = Matrix.LocRotScale(Vector(node.position),
+                                                               Quaternion((-w, x, y, z)),
+                                                               Vector(node.scale))
                     if "NORMAL" in mesh.vertices.dtype.names:
                         add_custom_normals(mesh.vertices["NORMAL"], mesh_data)
                     if "UV1" in mesh.vertices.dtype.names:
@@ -73,6 +82,18 @@ def pig_load(operator, filepath: str, files: list[str]):
                         add_uv_layer("UV2", mesh.vertices["UV2"], mesh_data, flip_uv=True)
                     if "VCOLOR" in mesh.vertices.dtype.names:
                         add_vertex_color_layer("VCOLOR", mesh.vertices["VCOLOR"].astype(np.float32) / 255, mesh_data)
+
+                    if lod.have_skeleton:
+                        remap = mesh.unk_buffer
+                        remap_table = np.zeros((len(remap)), np.uint8)
+                        for n, r in enumerate(remap):
+                            remap_table[n] = r[7]
+                        add_weights(remap_table[mesh.vertices["INDICES"]].reshape((-1, 4)), mesh.vertices["WEIGHTS"],
+                                    [node.name for node in nodes],
+                                    mesh_obj)
+                        modifier = mesh_obj.modifiers.new(type="ARMATURE", name="Armature")
+                        modifier.object = skeleton_object
+
                     collection.objects.link(mesh_obj)
     return {"FINISHED"}
 

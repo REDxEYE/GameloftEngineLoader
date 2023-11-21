@@ -178,14 +178,15 @@ class Mesh:
         if vertex_format & VertexFormat.UV2:
             vertex_attributes.append(("UV2", np.float32, (2,)))
         if have_skeleton:
-            vertex_attributes.append(("RIG_RELATED", np.uint8, (8,)))
+            vertex_attributes.append(("INDICES", np.uint8, (4,)))
+            vertex_attributes.append(("WEIGHTS", np.float32, (4,)))
         pprint(vertex_attributes)
         vertex_type = np.dtype(vertex_attributes)
         vertices = np.zeros(vertex_count, vertex_type)
         if flags & MeshFlags.PACKED_VERTEX_DATA:
             if vertex_format & VertexFormat.POSITION:
-                positions = np.frombuffer(geo_data.read(vertex_count * 8), np.int16).reshape((-1, 4))[:, :3].astype(
-                    np.float32)
+                positions = np.frombuffer(geo_data.read(vertex_count * 8), np.int16).reshape((-1, 4))
+                positions = positions[:, :3].astype(np.float32)
                 positions /= 32767
                 positions *= size
                 positions += offset
@@ -209,7 +210,9 @@ class Mesh:
             if vertex_format & VertexFormat.UV2:
                 vertices["UV2"][:] = np.frombuffer(geo_data.read(vertex_count * 8), np.float32).reshape((-1, 2))
             if have_skeleton:
-                geo_data.skip(8 * vertex_count)
+                vertices["INDICES"] = np.frombuffer(geo_data.read(vertex_count * 4), np.uint8).reshape((-1, 4))
+                vertices["WEIGHTS"] = np.frombuffer(geo_data.read(vertex_count * 4), np.uint8).reshape((-1, 4)).astype(
+                    np.float32) / 255
         else:
             if vertex_format & VertexFormat.POSITION:
                 vertices["POSITION"][:] = np.frombuffer(geo_data.read(vertex_count * 12), np.float32).reshape((-1, 3))
@@ -232,7 +235,9 @@ class Mesh:
             if vertex_format & VertexFormat.UV2:
                 vertices["UV2"][:] = np.frombuffer(geo_data.read(vertex_count * 8), np.float32).reshape((-1, 2))
             if have_skeleton:
-                geo_data.skip(8 * vertex_count)
+                vertices["INDICES"] = np.frombuffer(geo_data.read(vertex_count * 4), np.uint8).reshape((-1, 4))
+                vertices["WEIGHTS"] = np.frombuffer(geo_data.read(vertex_count * 4), np.uint8).reshape((-1, 4)).astype(
+                    np.float32) / 255
         _faces = np.frombuffer(geo_data.read(face_count * 2), np.int16)
         faces = []
         z = 0
