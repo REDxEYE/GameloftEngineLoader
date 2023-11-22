@@ -118,7 +118,7 @@ plugin_info = {
     "name": "Gameloft engine",
     "id": "GameloftEngineLoader",
     "description": "Import Gameloft engine assets",
-    "version": (0, 1, 1),
+    "version": (0, 1, 2),
     "loaders": [
         {
             "name": "Load .pig file",
