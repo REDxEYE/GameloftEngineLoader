@@ -12,8 +12,24 @@ def pig_init():
     pass
 
 
+def pvr_init():
+    pass
+
+
 def plugin_init():
     pass
+
+
+def pvr_load(operator, filepath: str, files: list[str]):
+    base_path = Path(filepath).parent
+    for file in files:
+        texture = Texture.from_pvr(base_path / file)
+        if not texture:
+            operator.report({"ERROR"}, f"Failed to load {base_path / file}")
+            continue
+        if create_image_from_texture(file, texture, True) is None:
+            operator.report({"ERROR"}, f"Failed to create texture from {base_path / file}")
+    return {"FINISHED"}
 
 
 def _create_skeleton(model_name: str, nodes: list[Node]):
@@ -110,6 +126,15 @@ plugin_info = {
             "exts": ("*.pig",),
             "init_fn": pig_init,
             "import_fn": pig_load,
+            "properties": [
+            ]
+        },
+        {
+            "name": "Load .pvr(or any other name) file",
+            "id": "gle_pvr",
+            "exts": ("*.*",),
+            "init_fn": pvr_init,
+            "import_fn": pvr_load,
             "properties": [
             ]
         },

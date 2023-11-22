@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from enum import IntEnum, IntFlag
-from pprint import pprint
 from typing import Optional
 
 import numpy as np
@@ -180,7 +179,6 @@ class Mesh:
         if have_skeleton:
             vertex_attributes.append(("INDICES", np.uint8, (4,)))
             vertex_attributes.append(("WEIGHTS", np.float32, (4,)))
-        pprint(vertex_attributes)
         vertex_type = np.dtype(vertex_attributes)
         vertices = np.zeros(vertex_count, vertex_type)
         if flags & MeshFlags.PACKED_VERTEX_DATA:
