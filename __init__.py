@@ -1,10 +1,11 @@
+import math
 from pathlib import Path
 
 import bpy
 import numpy as np
 from mathutils import Vector, Quaternion, Matrix
 
-from .pig import Node, load_pig
+from .pig import Node, load_pig, Camera
 from ...common_api import *
 
 
@@ -32,6 +33,19 @@ def pvr_load(operator, filepath: str, files: list[str]):
     return {"FINISHED"}
 
 
+def _create_camera(camera: Camera):
+    camera_name = camera.name
+    data_name = camera.data_name
+    cam_data = bpy.data.cameras.new(data_name)
+    cam_obj = bpy.data.objects.new(camera_name, cam_data)
+    cam_obj.matrix_local = camera.transform.matrix()
+    cam_data.lens_unit = 'FOV'
+    cam_data.angle = math.radians(camera.xfov)
+    cam_data.clip_start = camera.z_near
+    cam_data.clip_end = camera.z_far
+    bpy.context.scene.collection.objects.link(cam_obj)
+
+
 def _create_skeleton(model_name: str, nodes: list[Node]):
     arm_data = bpy.data.armatures.new(model_name + "_ARMDATA")
     arm_obj = bpy.data.objects.new(model_name + "_ARM", arm_data)
@@ -45,7 +59,7 @@ def _create_skeleton(model_name: str, nodes: list[Node]):
         if bone.type == 0 and n != 0:
             continue
         bl_bone = arm_data.edit_bones.new(bone.name)
-        bl_bone.tail = Vector([0, 0, 0.5 * max(0.01, bone.unk0)]) + bl_bone.head
+        bl_bone.tail = Vector([0.1, 0, 0]) + bl_bone.head
     for n, bone in enumerate(nodes):
         if bone.type == 0 and n != 0:
             continue
@@ -56,10 +70,8 @@ def _create_skeleton(model_name: str, nodes: list[Node]):
     for n, bone in enumerate(nodes):
         if bone.type == 0 and n != 0:
             continue
-        z, y, x, w = bone.rotation
-        matrix = Matrix.LocRotScale(Vector(bone.position), Quaternion((w, x, y, z)), Vector(bone.scale))
         bl_bone = arm_obj.pose.bones[bone.name]
-
+        matrix = bone.transform.matrix()
         if bl_bone.parent:
             bl_bone.matrix = bl_bone.parent.matrix @ matrix
         else:
@@ -75,7 +87,10 @@ def pig_load(operator, filepath: str, files: list[str]):
     for file in files:
         filepath = base_path / file
         with FileBuffer(filepath, "rb") as f:
-            nodes, objects = load_pig(filepath.stem, f)
+            pig_file = load_pig(filepath.stem, f)
+        nodes = pig_file.nodes
+        objects = pig_file.objects
+        cameras = pig_file.cameras
         skeleton_object = _create_skeleton(filepath.stem, nodes)
 
         for object in objects:
@@ -87,9 +102,7 @@ def pig_load(operator, filepath: str, files: list[str]):
                     mesh_data.from_pydata(mesh.vertices["POSITION"], [], mesh.faces)
                     mesh_data.update(calc_edges=True, calc_edges_loose=True)
                     x, y, z, w = node.rotation
-                    mesh_obj.matrix_local = Matrix.LocRotScale(Vector(node.position),
-                                                               Quaternion((-w, x, y, z)),
-                                                               Vector(node.scale))
+                    mesh_obj.matrix_local = node.transform.matrix()
                     if "NORMAL" in mesh.vertices.dtype.names:
                         add_custom_normals(mesh.vertices["NORMAL"], mesh_data)
                     if "UV1" in mesh.vertices.dtype.names:
@@ -111,6 +124,8 @@ def pig_load(operator, filepath: str, files: list[str]):
                         modifier.object = skeleton_object
 
                     collection.objects.link(mesh_obj)
+        for camera in cameras:
+            _create_camera(camera)
     return {"FINISHED"}
 
 

@@ -3,8 +3,25 @@ from enum import IntEnum, IntFlag
 from typing import Optional
 
 import numpy as np
+from mathutils import Matrix, Quaternion, Vector
 
 from ...common_api import *
+
+
+@dataclass(slots=True)
+class Transform:
+    position: Vector3
+    rotation: Vector4
+    scale: Vector3
+    unk: float
+
+    @classmethod
+    def from_buffer(cls, buffer: Buffer):
+        return cls(buffer.read_fmt("3f"), buffer.read_fmt("4f"), buffer.read_fmt("3f"), buffer.read_float())
+
+    def matrix(self):
+        x, y, z, w = self.rotation
+        return Matrix.LocRotScale(Vector(self.position), Quaternion((-w, x, y, z)), Vector(self.scale))
 
 
 @dataclass(slots=True)
@@ -12,10 +29,7 @@ class Node:
     name: str
     type: int
     parent_id: int
-    position: Vector3
-    rotation: Vector4
-    scale: Vector3
-    unk0: float
+    transform: Transform
     unk1: tuple[int, int]
 
     @classmethod
@@ -23,11 +37,9 @@ class Node:
         assert buffer.read_uint32() == 100, "Invalid ident"
         name = buffer.read_ascii_string(buffer.read_uint16())
         node_type, parent_id = buffer.read_fmt("Bh")
-        position = buffer.read_fmt("3f")
-        rotation = buffer.read_fmt("4f")
-        scale = buffer.read_fmt("3f")
-        unk0, *unk1 = buffer.read_fmt("f2B")
-        return cls(name, node_type, parent_id, position, rotation, scale, unk0, unk1)
+        transform = Transform.from_buffer(buffer)
+        unk1 = buffer.read_fmt("2B")
+        return cls(name, node_type, parent_id, transform, unk1)
 
 
 @dataclass(slots=True)
@@ -280,10 +292,43 @@ class Object:
         return cls(node_id, lods)
 
 
+@dataclass(slots=True)
+class Camera:
+    name: str
+    unk0: tuple[int, int]
+    transform: Transform
+    unk1: int
+    data_name: str
+    xfov: float
+    aspect_ratio: float
+    z_near: float
+    z_far: float
+
+    @classmethod
+    def from_buffer(cls, buffer: Buffer):
+        assert buffer.read_uint32() == 100, "Invalid ident"
+        name = buffer.read_ascii_string(buffer.read_uint16())
+        unk0 = buffer.read_fmt("HB")
+        transform = Transform.from_buffer(buffer)
+        unk1 = buffer.read_uint16()
+        data_name = buffer.read_ascii_string(buffer.read_uint16())
+        xfov, aspect_ratio, z_near, z_far = buffer.read_fmt("4f")
+        buffer.align(4)
+        return cls(name, unk0, transform, unk1, data_name, xfov, aspect_ratio, z_near, z_far)
+
+
+@dataclass(slots=True)
+class PigFile:
+    nodes: list[Node]
+    objects: list[Object]
+    cameras: list[Camera]
+
+
 def load_pig(filename: str, buffer: Buffer):
     assert buffer.read_uint32() == 100, "Invalid ident"
     nodes = [Node.from_buffer(buffer) for _ in range(buffer.read_uint16())]
     buffer.skip(1)
     objects = [Object.from_buffer(buffer) for _ in range(buffer.read_uint16())]
+    cameras = [Camera.from_buffer(buffer) for _ in range(buffer.read_uint16())]
 
-    return nodes, objects
+    return PigFile(nodes, objects, cameras)
