@@ -3,7 +3,7 @@ from pathlib import Path
 
 import bpy
 import numpy as np
-from mathutils import Vector, Quaternion, Matrix
+from mathutils import Vector
 
 from .pig import Node, load_pig, Camera
 from ...common_api import *
@@ -101,7 +101,6 @@ def pig_load(operator, filepath: str, files: list[str]):
                     mesh_obj = bpy.data.objects.new(node.name, mesh_data)
                     mesh_data.from_pydata(mesh.vertices["POSITION"], [], mesh.faces)
                     mesh_data.update(calc_edges=True, calc_edges_loose=True)
-                    x, y, z, w = node.rotation
                     mesh_obj.matrix_local = node.transform.matrix()
                     if "NORMAL" in mesh.vertices.dtype.names:
                         add_custom_normals(mesh.vertices["NORMAL"], mesh_data)
